@@ -119,29 +119,45 @@ def main():
                         mime="text/csv",
                     )
                     
-                    # Plot XP data
-                    st.subheader(f"{profile_name}'s Progress Visualization")
-                    df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'])
+                    # Visualization of XP Progress
+                    st.subheader(f"{profile_name}'s XP Progress Over Time")
+                    
+                    # Process the data
+                    df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format='%Y-%m-%d %H:%M:%S')
                     df.sort_values('datetime', inplace=True)
                     
-                    plt.figure(figsize=(10, 6))
-                    plt.barh(df['datetime'].dt.strftime('%d-%m %H:%M'), df['xp'], color='#22FF44', edgecolor='black')
-                    plt.xlabel("XP Gained")
-                    plt.ylabel("Date & Time")
-                    plt.title("XP Progress Over Time")
+                    # Prepare the plot
+                    plt.figure(figsize=(12, max(5, len(df) // 3)))  # Dynamic height based on data
+                    plt.barh(
+                        y=df['datetime'].dt.strftime('%d-%m %H:%M'),  # Format datetime for readability
+                        width=df['xp'],
+                        color='#22FF44',
+                        edgecolor='black'
+                    )
                     
-                    # Save the plot
+                    # Annotate bars with XP values
+                    for index, value in enumerate(df['xp']):
+                        plt.text(value + 5, index, str(value), va='center', fontsize=10, color='black')
+                    
+                    # Labels and title
+                    plt.xlabel("XP Gained", fontsize=12)
+                    plt.ylabel("Date & Time (Sorted)", fontsize=12)
+                    plt.title(f"{profile_name}'s XP Progress Visualization", fontsize=14)
+                    plt.tight_layout()
+                    
+                    # Save and display plot
                     plot_filename = f"{profile_name}_progress_plot.png"
                     plt.savefig(plot_filename)
                     st.pyplot(plt.gcf())
                     
-                    # Download button for plot
+                    # Provide download option for the plot
                     st.download_button(
-                        label="Download Plot (PNG)",
+                        label="Download Progress Plot (PNG)",
                         data=open(plot_filename, "rb").read(),
                         file_name=plot_filename,
                         mime="image/png",
                     )
+
                     
                     # Show and download canvas image
                     if canvas_image:
