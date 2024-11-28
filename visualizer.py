@@ -164,9 +164,32 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error(f"❌ Error: Wrong username!!")
+                    st.error(f"❌ Error: Wrong username!! Try again")
         else:
             st.warning("Please enter a username.")
 
+def add_footer():
+    footer = """
+    <style>
+        /* Position the footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            text-align: right;
+            font-size: 12px;
+            padding: 10px;
+            color: #777;
+        }
+    </style>
+    <div class="footer">
+        © 2024 YourAppName. All rights reserved.
+    </div>
+    """
+    st.markdown(footer, unsafe_allow_html=True)
+
+
 if __name__ == "__main__":
     main()
+    add_footer()
