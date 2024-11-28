@@ -81,10 +81,17 @@ def scrape_duolingo_progress(username):
                                 "time": dt_local.strftime("%H:%M:%S"),
                                 "xp": xp
                             })
-        
-        # Create a DataFrame
-        df = pd.DataFrame(data)
-        return profile_name, df, timezone_str
+
+        # Fetch canvas image
+        canvas_element = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#myCanvas"))
+        )
+        canvas_data_url = driver.execute_script(
+            "return arguments[0].toDataURL('image/png').substring(21);", canvas_element
+        )
+        canvas_image_data = base64.b64decode(canvas_data_url)
+
+        return profile_name, pd.DataFrame(data), timezone_str, canvas_image_data
 
     finally:
         driver.quit()
@@ -116,7 +123,7 @@ def main():
         if username:
             with st.spinner("Fetching data..."):
                 try:
-                    profile_name, df, timezone_str = scrape_duolingo_progress(username)
+                    profile_name, df, timezone_str, canvas_image_data = scrape_duolingo_progress(username)
                     st.success(f"Data fetched successfully for {profile_name}!")
                     
                     # Display player's timezone
@@ -124,7 +131,7 @@ def main():
                     
                     # Display progress data
                     st.subheader("Progress Data")
-                    st.dataframe(df)
+                    st.dataframe(df, use_container_width=True)
 
                     # Download data as CSV (without `datetime` column)
                     csv = df[['date', 'time', 'xp']].to_csv(index=False).encode('utf-8')
@@ -145,12 +152,13 @@ def main():
                         file_name=f"{profile_name}_progress_plot.png",
                         mime="image/png"
                     )
-                    # Display and download canvas
-                    st.subheader("Progress History Canvas")
-                    st.image(canvas_image, caption="Progress History Canvas", use_column_width=True)
+
+                    # Display and download canvas image
+                    st.subheader("History Canvas Image")
+                    st.image(canvas_image_data, caption="History Canvas", use_column_width=True)
                     st.download_button(
-                        label="Download Canvas (PNG)",
-                        data=canvas_image,
+                        label="Download History Canvas (PNG)",
+                        data=canvas_image_data,
                         file_name=f"{profile_name}_history.png",
                         mime="image/png"
                     )
