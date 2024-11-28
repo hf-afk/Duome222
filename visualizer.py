@@ -145,6 +145,15 @@ def main():
                         file_name=f"{profile_name}_progress_plot.png",
                         mime="image/png"
                     )
+                    # Display and download canvas
+                    st.subheader("Progress History Canvas")
+                    st.image(canvas_image, caption="Progress History Canvas", use_column_width=True)
+                    st.download_button(
+                        label="Download Canvas (PNG)",
+                        data=canvas_image,
+                        file_name=f"{profile_name}_history.png",
+                        mime="image/png"
+                    )
 
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
