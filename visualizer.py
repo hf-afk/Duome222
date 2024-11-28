@@ -119,45 +119,48 @@ def main():
                         mime="text/csv",
                     )
                     
-                    # Visualization of XP Progress
-                    st.subheader(f"{profile_name}'s XP Progress Over Time")
-                    
-                    # Process the data
-                    df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format='%Y-%m-%d %H:%M:%S')
+                    # Plot XP data
+                    st.subheader(f"{profile_name}'s Progress Visualization")
+                    df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'])
                     df.sort_values('datetime', inplace=True)
+
+                    # Prepare the plot with dynamic height adjustment
+                    row_count = len(df)
+                    plt.figure(figsize=(12, max(5, row_count // 3)))  # Adjust height dynamically
                     
-                    # Prepare the plot
-                    plt.figure(figsize=(12, max(5, len(df) // 3)))  # Dynamic height based on data
+                    # Plot horizontal bars
                     plt.barh(
-                        y=df['datetime'].dt.strftime('%d-%m %H:%M'),  # Format datetime for readability
-                        width=df['xp'],
-                        color='#22FF44',
+                        df.index,  # Indexes as the y-axis
+                        df['xp'],  # XP values as the width of bars
+                        color='#22FF44', 
                         edgecolor='black'
                     )
                     
-                    # Annotate bars with XP values
+                    # Add XP labels to bars
                     for index, value in enumerate(df['xp']):
-                        plt.text(value + 5, index, str(value), va='center', fontsize=10, color='black')
+                        plt.text(
+                            value + 5, index, str(value), va='center', fontsize=9, color='black'
+                        )
                     
-                    # Labels and title
+                    # Set y-axis labels to include date and time
+                    plt.yticks(df.index, df['datetime'].dt.strftime('%d-%m %H:%M'), fontsize=10)
                     plt.xlabel("XP Gained", fontsize=12)
-                    plt.ylabel("Date & Time (Sorted)", fontsize=12)
-                    plt.title(f"{profile_name}'s XP Progress Visualization", fontsize=14)
+                    plt.ylabel("Lesson (Date & Time)", fontsize=12)
+                    plt.title(f"{profile_name}'s XP Progress", fontsize=14)
                     plt.tight_layout()
                     
-                    # Save and display plot
+                    # Save and display the plot
                     plot_filename = f"{profile_name}_progress_plot.png"
                     plt.savefig(plot_filename)
                     st.pyplot(plt.gcf())
                     
-                    # Provide download option for the plot
+                    # Provide download button for the plot
                     st.download_button(
-                        label="Download Progress Plot (PNG)",
+                        label="Download Plot (PNG)",
                         data=open(plot_filename, "rb").read(),
                         file_name=plot_filename,
                         mime="image/png",
                     )
-
                     
                     # Show and download canvas image
                     if canvas_image:
