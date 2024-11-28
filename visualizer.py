@@ -177,7 +177,7 @@ def add_footer():
             bottom: 0;
             right: 0;
             width: 100%;
-            text-align: right;
+            text-align: left;
             font-size: 12px;
             padding: 10px;
             color: #777;
