@@ -32,5 +32,7 @@ tzlocal==5.2
 urllib3==2.2.3
 websocket-client==1.8.0
 wsproto==1.2.0
-playwright==1.49.0
+streamlit
+seleniumbase
+webdriver-manager
 
