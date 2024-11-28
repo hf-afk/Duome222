@@ -41,6 +41,7 @@ def scrape_duolingo_progress(username):
         hours = int(offset_match.group(1)) if offset_match else 0
         minutes = int(offset_match.group(2) or 0) if offset_match else 0
         profile_utc_offset = timedelta(hours=hours, minutes=minutes)
+        timezone_str = f"UTC{'+' if hours >= 0 else ''}{hours}:{str(minutes).zfill(2)}"
         
         # Detect local timezone
         local_tz = get_localzone()
@@ -83,19 +84,7 @@ def scrape_duolingo_progress(username):
         
         # Create a DataFrame
         df = pd.DataFrame(data)
-        df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format="%d-%m-%Y %H:%M:%S")
-        df.sort_values('datetime', inplace=True)
-        df.reset_index(drop=True, inplace=True)
-
-        # Canvas scraping
-        canvas_element = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "#myCanvas"))
-        )
-        canvas_data_url = driver.execute_script(
-            "return arguments[0].toDataURL('image/png').substring(21);", canvas_element
-        )
-        canvas_image_data = base64.b64decode(canvas_data_url)
-        return profile_name, df, canvas_image_data
+        return profile_name, df, timezone_str
 
     finally:
         driver.quit()
@@ -119,7 +108,7 @@ def plot_progress(df, profile_name):
 
 # Streamlit App
 def main():
-    st.title("Duolingo Progress Tracker")
+    st.title("🦉 Duolingo Progress Tracker")
     st.markdown("Enter a Duolingo username to fetch and visualize their progress.")
     
     username = st.text_input("Enter Duolingo username:")
@@ -127,15 +116,18 @@ def main():
         if username:
             with st.spinner("Fetching data..."):
                 try:
-                    profile_name, df, canvas_image = scrape_duolingo_progress(username)
+                    profile_name, df, timezone_str = scrape_duolingo_progress(username)
                     st.success(f"Data fetched successfully for {profile_name}!")
+                    
+                    # Display player's timezone
+                    st.markdown(f"**Player's Timezone:** {timezone_str}")
                     
                     # Display progress data
                     st.subheader("Progress Data")
                     st.dataframe(df)
 
-                    # Download data as CSV
-                    csv = df.to_csv(index=False).encode('utf-8')
+                    # Download data as CSV (without `datetime` column)
+                    csv = df[['date', 'time', 'xp']].to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="Download Progress Data (CSV)",
                         data=csv,
@@ -154,17 +146,8 @@ def main():
                         mime="image/png"
                     )
 
-                    # Display and download canvas
-                    st.subheader("Progress History Canvas")
-                    st.image(canvas_image, caption="Progress History Canvas", use_column_width=True)
-                    st.download_button(
-                        label="Download Canvas (PNG)",
-                        data=canvas_image,
-                        file_name=f"{profile_name}_history.png",
-                        mime="image/png"
-                    )
                 except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                    st.error(f"❌ Error: {str(e)}")
         else:
             st.warning("Please enter a username.")
 
