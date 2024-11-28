@@ -164,7 +164,7 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
+                    st.error(f"❌ Error: Wrong username!!")
         else:
             st.warning("Please enter a username.")
 
