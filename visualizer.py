@@ -98,20 +98,31 @@ def scrape_duolingo_progress(username):
 
 # Plotting function
 def plot_progress(df, profile_name):
+    # Reverse the DataFrame for ascending order on the Y-axis
+    df = df.iloc[::-1].reset_index(drop=True)
+
+    # Plot the horizontal bar chart
     row_count = len(df)
     plt.figure(figsize=(12, max(4, row_count // 3)))
     plt.barh(df.index, df['xp'], color='#22FF44', edgecolor='black')
+
+    # Add XP labels on bars
     for index, value in enumerate(df['xp']):
         plt.text(value + 5, index, str(value), va='center', fontsize=9, color='black')
+
+    # Set Y-axis labels in ascending order of date and time
     plt.yticks(df.index, df['date'] + ' ' + df['time'], fontsize=10)
     plt.xlabel("XP Gained", fontsize=14)
     plt.ylabel("Lesson (Date & Time)", fontsize=14)
     plt.title(f"{profile_name}'s Progress Visualization", fontsize=16)
     plt.tight_layout(pad=2.0)
+
+    # Save the plot to a buffer and return
     buffer = BytesIO()
     plt.savefig(buffer, format='png')
     buffer.seek(0)
     return buffer
+
 
 # Streamlit App
 def main():
@@ -184,7 +195,7 @@ def add_footer():
         }
     </style>
     <div class="footer">
-        © 2024 Made with 💚 by 4Z!Z.
+        © 2024 Made with 💚 by AZIZ.
     </div>
     """
     st.markdown(footer, unsafe_allow_html=True)
