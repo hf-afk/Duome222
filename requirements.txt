@@ -35,4 +35,4 @@ wsproto==1.2.0
 streamlit
 seleniumbase
 webdriver-manager
-
+altair
