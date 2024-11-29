@@ -156,7 +156,7 @@ def main():
                     # Display and download plot
                     st.subheader("Progress Visualization")
                     plot_buffer = plot_progress(df, profile_name)
-                    st.image(plot_buffer, caption="Progress Visualization", use_column_width=True)
+                    st.image(plot_buffer, caption="Progress Visualization", use_container_width=True)
                     st.download_button(
                         label="Download Plot (PNG)",
                         data=plot_buffer,
@@ -166,7 +166,7 @@ def main():
 
                     # Display and download canvas image
                     st.subheader("History Canvas Image")
-                    st.image(canvas_image_data, caption="History Canvas", use_column_width=True)
+                    st.image(canvas_image_data, caption="History Canvas", use_container_width=True)
                     st.download_button(
                         label="Download History Canvas (PNG)",
                         data=canvas_image_data,
