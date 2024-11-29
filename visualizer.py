@@ -1,6 +1,4 @@
-# Install necessary libraries if needed
-# pip install streamlit pandas selenium beautifulsoup4 plotly pytz tzlocal webdriver-manager
-
+# Import necessary libraries
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -15,30 +13,20 @@ from tzlocal import get_localzone
 import re
 import base64
 from io import BytesIO
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.core.os_manager import ChromeType
-
 
 # Function to scrape Duolingo progress
 def scrape_duolingo_progress(username):
     url = f"https://duome.eu/{username}"
-    options = Options()
+    options = webdriver.ChromeOptions()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-
-    driver = webdriver.Chrome(
-        service=Service(
-            ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
-        ),
-        options=options,
-    )
+    
+    driver = webdriver.Chrome(options=options)
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 10)
-
+        
         # Fetch the profile name
         profile_name_element = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h3 span.json-name"))
@@ -54,7 +42,7 @@ def scrape_duolingo_progress(username):
         minutes = int(offset_match.group(2) or 0) if offset_match else 0
         profile_utc_offset = timedelta(hours=hours, minutes=minutes)
         timezone_str = f"UTC{'+' if hours >= 0 else ''}{hours}:{str(minutes).zfill(2)}"
-
+        
         # Detect local timezone
         local_tz = get_localzone()
 
@@ -65,12 +53,12 @@ def scrape_duolingo_progress(username):
         raw_button.click()
         raw_data_element = wait.until(EC.presence_of_element_located((By.ID, "raw")))
         raw_html = raw_data_element.get_attribute("innerHTML")
-
+        
         # Parse raw data
         soup = BeautifulSoup(raw_html, "html.parser")
         xp_entries = soup.find_all("li")
         data = []
-
+        
         for entry in xp_entries:
             text = entry.get_text(strip=True)
             if "XP" in text:
@@ -89,10 +77,8 @@ def scrape_duolingo_progress(username):
                             dt_utc = dt_profile - profile_utc_offset
                             dt_local = dt_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
                             data.append({
-                                "date": dt_local.strftime("%Y-%m-%d"),
-                                "time": dt_local.strftime("%H:%M:%S"),
-                                "xp": xp,
                                 "datetime": dt_local,
+                                "xp": xp
                             })
 
         # Fetch canvas image
@@ -109,10 +95,9 @@ def scrape_duolingo_progress(username):
     finally:
         driver.quit()
 
-
 # Streamlit App
 def main():
-    st.title("🦉 Duolingo Progress Tracker with Plotly")
+    st.title("🦉 Duolingo Progress Tracker")
     st.markdown("Enter a Duolingo username to fetch and visualize their progress.")
     
     username = st.text_input("Enter Duolingo username:")
@@ -122,16 +107,17 @@ def main():
                 try:
                     profile_name, df, timezone_str, canvas_image_data = scrape_duolingo_progress(username)
                     st.success(f"Data fetched successfully for {profile_name}!")
-
+                    
                     # Display player's timezone
                     st.markdown(f"**Player's Timezone:** {timezone_str}")
-
+                    
                     # Display progress data
                     st.subheader("Progress Data")
-                    st.dataframe(df[['date', 'time', 'xp']], use_container_width=True)
+                    df['datetime_str'] = df['datetime'].dt.strftime('%d-%m-%Y %H:%M:%S')
+                    st.dataframe(df[['datetime_str', 'xp']].rename(columns={'datetime_str': 'Date & Time'}), use_container_width=True)
 
                     # Download data as CSV
-                    csv = df[['date', 'time', 'xp']].to_csv(index=False).encode('utf-8')
+                    csv = df[['datetime_str', 'xp']].rename(columns={'datetime_str': 'Date & Time'}).to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="Download Progress Data (CSV)",
                         data=csv,
@@ -139,26 +125,30 @@ def main():
                         mime="text/csv"
                     )
 
-                    # Display progress visualization using Plotly
+                    # Display Plotly visualization
                     st.subheader("Progress Visualization")
                     fig = px.bar(
                         df,
                         x='xp',
                         y='datetime',
                         orientation='h',
-                        text='xp',
-                        labels={'datetime': 'Date & Time', 'xp': 'XP Gained'},
-                        title=f"{profile_name}'s Progress Visualization",
-                        template='plotly_white',
+                        labels={'xp': 'XP Gained', 'datetime': 'Date & Time'},
+                        title=f"{profile_name}'s XP Progress",
                     )
-                    fig.update_traces(marker_color='#22FF44', textposition='outside')
+                    fig.update_layout(
+                        yaxis=dict(categoryorder='total ascending'),
+                        height=max(400, len(df) * 30),  # Dynamically adjust height
+                        margin=dict(l=120, r=20, t=40, b=40),
+                    )
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Download Plotly graph as PNG
-                    png_bytes = fig.to_image(format="png")
+                    buffer = BytesIO()
+                    fig.write_image(buffer, format='png')
+                    buffer.seek(0)
                     st.download_button(
-                        label="Download Plot (PNG)",
-                        data=png_bytes,
+                        label="Download Progress Plot (PNG)",
+                        data=buffer,
                         file_name=f"{profile_name}_progress_plot.png",
                         mime="image/png"
                     )
@@ -174,14 +164,14 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error(f"❌ Error: Wrong username!! Please try again")
+                    st.error(f"❌ Error: {e}")
         else:
             st.warning("Please enter a username.")
-
 
 def add_footer():
     footer = """
     <style>
+        /* Position the footer */
         .footer {
             position: fixed;
             bottom: 0;
@@ -198,7 +188,6 @@ def add_footer():
     </div>
     """
     st.markdown(footer, unsafe_allow_html=True)
-
 
 if __name__ == "__main__":
     main()
