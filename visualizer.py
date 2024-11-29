@@ -1,6 +1,4 @@
-# Install necessary libraries
-# pip install streamlit pandas selenium beautifulsoup4 pytz tzlocal altair base64
-
+# Import necessary libraries
 import streamlit as st
 import pandas as pd
 from selenium import webdriver
@@ -14,7 +12,6 @@ from tzlocal import get_localzone
 import re
 import base64
 import altair as alt
-from io import BytesIO
 
 # Function to scrape Duolingo progress
 def scrape_duolingo_progress(username):
@@ -23,12 +20,12 @@ def scrape_duolingo_progress(username):
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-
+    
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 10)
-
+        
         # Fetch the profile name
         profile_name_element = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h3 span.json-name"))
@@ -44,7 +41,7 @@ def scrape_duolingo_progress(username):
         minutes = int(offset_match.group(2) or 0) if offset_match else 0
         profile_utc_offset = timedelta(hours=hours, minutes=minutes)
         timezone_str = f"UTC{'+' if hours >= 0 else ''}{hours}:{str(minutes).zfill(2)}"
-
+        
         # Detect local timezone
         local_tz = get_localzone()
 
@@ -55,12 +52,12 @@ def scrape_duolingo_progress(username):
         raw_button.click()
         raw_data_element = wait.until(EC.presence_of_element_located((By.ID, "raw")))
         raw_html = raw_data_element.get_attribute("innerHTML")
-
+        
         # Parse raw data
         soup = BeautifulSoup(raw_html, "html.parser")
         xp_entries = soup.find_all("li")
         data = []
-
+        
         for entry in xp_entries:
             text = entry.get_text(strip=True)
             if "XP" in text:
@@ -79,9 +76,9 @@ def scrape_duolingo_progress(username):
                             dt_utc = dt_profile - profile_utc_offset
                             dt_local = dt_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
                             data.append({
+                                "datetime": dt_local,
                                 "date": dt_local.strftime("%d-%m-%Y"),
                                 "time": dt_local.strftime("%H:%M:%S"),
-                                "datetime": dt_local,
                                 "xp": xp
                             })
 
@@ -99,29 +96,12 @@ def scrape_duolingo_progress(username):
     finally:
         driver.quit()
 
-# Plotting function using Altair
-def plot_progress_altair(df, profile_name):
-    chart = (
-        alt.Chart(df)
-        .mark_bar(color="#22FF44", cornerRadiusEnd=5)
-        .encode(
-            x=alt.X("xp:Q", title="XP Gained"),
-            y=alt.Y("datetime:T", title="Date & Time", axis=alt.Axis(format="%d-%m %H:%M")),
-            tooltip=["datetime:T", "xp:Q"]
-        )
-        .properties(
-            width=800,
-            height=400,
-            title=f"{profile_name}'s Progress Visualization"
-        )
-    )
-    return chart
 
 # Streamlit App
 def main():
     st.title("🦉 Duolingo Progress Tracker")
     st.markdown("Enter a Duolingo username to fetch and visualize their progress.")
-
+    
     username = st.text_input("Enter Duolingo username:")
     if st.button("Fetch Progress"):
         if username:
@@ -129,16 +109,16 @@ def main():
                 try:
                     profile_name, df, timezone_str, canvas_image_data = scrape_duolingo_progress(username)
                     st.success(f"Data fetched successfully for {profile_name}!")
-
+                    
                     # Display player's timezone
                     st.markdown(f"**Player's Timezone:** {timezone_str}")
-
+                    
                     # Display progress data
                     st.subheader("Progress Data")
-                    st.dataframe(df[["date", "time", "xp"]], use_container_width=True)
+                    st.dataframe(df[['date', 'time', 'xp']], use_container_width=True)
 
                     # Download data as CSV
-                    csv = df[["date", "time", "xp"]].to_csv(index=False).encode("utf-8")
+                    csv = df[['date', 'time', 'xp']].to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="Download Progress Data (CSV)",
                         data=csv,
@@ -146,20 +126,27 @@ def main():
                         mime="text/csv"
                     )
 
-                    # Display and download progress plot
+                    # Create Altair chart
                     st.subheader("Progress Visualization")
-                    altair_chart = plot_progress_altair(df, profile_name)
-                    st.altair_chart(altair_chart, use_container_width=True)
+                    chart = alt.Chart(df).mark_bar().encode(
+                        y=alt.Y('datetime:T', axis=alt.Axis(title="Lesson (Date & Time)", labelAngle=-45)),
+                        x=alt.X('xp:Q', axis=alt.Axis(title="XP Gained")),
+                        color=alt.value('#22FF44')
+                    ).properties(
+                        title=f"{profile_name}'s Progress Visualization",
+                        width=800,
+                        height=400
+                    )
 
-                    # Altair chart PNG download
-                    chart_png = altair_chart.save("chart.png")
-                    with open("chart.png", "rb") as img_file:
-                        st.download_button(
-                            label="Download Progress Visualization (PNG)",
-                            data=img_file,
-                            file_name=f"{profile_name}_progress_plot.png",
-                            mime="image/png"
-                        )
+                    # Render and export chart
+                    st.altair_chart(chart, use_container_width=True)
+                    chart.save('chart.png')
+                    st.download_button(
+                        label="Download Progress Chart (PNG)",
+                        data=open('chart.png', 'rb').read(),
+                        file_name=f"{profile_name}_progress_chart.png",
+                        mime="image/png"
+                    )
 
                     # Display and download canvas image
                     st.subheader("History Canvas Image")
@@ -172,9 +159,32 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error("❌ Error: Invalid username or data unavailable. Please try again.")
+                    st.error(f"❌ Error: {e}. Please try again.")
         else:
             st.warning("Please enter a username.")
 
+def add_footer():
+    footer = """
+    <style>
+        /* Position the footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            text-align: left;
+            font-size: 12px;
+            padding: 10px;
+            color: #777;
+        }
+    </style>
+    <div class="footer">
+        © 2024 Made with 💚 by AZIZ.
+    </div>
+    """
+    st.markdown(footer, unsafe_allow_html=True)
+
+
 if __name__ == "__main__":
     main()
+    add_footer()
