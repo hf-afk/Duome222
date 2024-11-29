@@ -1,7 +1,7 @@
 # Import necessary libraries
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import matplotlib.pyplot as plt
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -77,7 +77,8 @@ def scrape_duolingo_progress(username):
                             dt_utc = dt_profile - profile_utc_offset
                             dt_local = dt_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
                             data.append({
-                                "datetime": dt_local,
+                                "date": dt_local.strftime("%d-%m-%Y"),
+                                "time": dt_local.strftime("%H:%M:%S"),
                                 "xp": xp
                             })
 
@@ -94,6 +95,34 @@ def scrape_duolingo_progress(username):
 
     finally:
         driver.quit()
+
+# Plotting function
+def plot_progress(df, profile_name):
+    # Reverse the DataFrame for ascending order on the Y-axis
+    df = df.iloc[::-1].reset_index(drop=True)
+
+    # Plot the horizontal bar chart
+    row_count = len(df)
+    plt.figure(figsize=(12, max(4, row_count // 3)))
+    plt.barh(df.index, df['xp'], color='#22FF44', edgecolor='black')
+
+    # Add XP labels on bars
+    for index, value in enumerate(df['xp']):
+        plt.text(value + 5, index, str(value), va='center', fontsize=9, color='black')
+
+    # Set Y-axis labels in ascending order of date and time
+    plt.yticks(df.index, df['date'] + ' ' + df['time'], fontsize=10)
+    plt.xlabel("XP Gained", fontsize=14)
+    plt.ylabel("Lesson (Date & Time)", fontsize=14)
+    plt.title(f"{profile_name}'s Progress Visualization", fontsize=16)
+    plt.tight_layout(pad=2.0)
+
+    # Save the plot to a buffer and return
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    return buffer
+
 
 # Streamlit App
 def main():
@@ -113,11 +142,10 @@ def main():
                     
                     # Display progress data
                     st.subheader("Progress Data")
-                    df['datetime_str'] = df['datetime'].dt.strftime('%d-%m-%Y %H:%M:%S')
-                    st.dataframe(df[['datetime_str', 'xp']].rename(columns={'datetime_str': 'Date & Time'}), use_container_width=True)
+                    st.dataframe(df, use_container_width=True)
 
-                    # Download data as CSV
-                    csv = df[['datetime_str', 'xp']].rename(columns={'datetime_str': 'Date & Time'}).to_csv(index=False).encode('utf-8')
+                    # Download data as CSV (without `datetime` column)
+                    csv = df[['date', 'time', 'xp']].to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="Download Progress Data (CSV)",
                         data=csv,
@@ -125,30 +153,13 @@ def main():
                         mime="text/csv"
                     )
 
-                    # Display Plotly visualization
+                    # Display and download plot
                     st.subheader("Progress Visualization")
-                    fig = px.bar(
-                        df,
-                        x='xp',
-                        y='datetime',
-                        orientation='h',
-                        labels={'xp': 'XP Gained', 'datetime': 'Date & Time'},
-                        title=f"{profile_name}'s XP Progress",
-                    )
-                    fig.update_layout(
-                        yaxis=dict(categoryorder='total ascending'),
-                        height=max(400, len(df) * 30),  # Dynamically adjust height
-                        margin=dict(l=120, r=20, t=40, b=40),
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    # Download Plotly graph as PNG
-                    buffer = BytesIO()
-                    fig.write_image(buffer, format='png')
-                    buffer.seek(0)
+                    plot_buffer = plot_progress(df, profile_name)
+                    st.image(plot_buffer, caption="Progress Visualization", use_column_width=True)
                     st.download_button(
-                        label="Download Progress Plot (PNG)",
-                        data=buffer,
+                        label="Download Plot (PNG)",
+                        data=plot_buffer,
                         file_name=f"{profile_name}_progress_plot.png",
                         mime="image/png"
                     )
@@ -164,7 +175,7 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error(f"❌ Error: {e}")
+                    st.error(f"❌ Error: Wrong username!! Please try again")
         else:
             st.warning("Please enter a username.")
 
@@ -188,6 +199,7 @@ def add_footer():
     </div>
     """
     st.markdown(footer, unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
