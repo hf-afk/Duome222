@@ -1,6 +1,9 @@
-# Import necessary libraries
+# Install necessary libraries if needed
+# pip install streamlit pandas selenium beautifulsoup4 plotly pytz tzlocal webdriver-manager
+
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -11,21 +14,31 @@ import pytz
 from tzlocal import get_localzone
 import re
 import base64
-import altair as alt
+from io import BytesIO
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.core.os_manager import ChromeType
+
 
 # Function to scrape Duolingo progress
 def scrape_duolingo_progress(username):
     url = f"https://duome.eu/{username}"
-    options = webdriver.ChromeOptions()
+    options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    
-    driver = webdriver.Chrome(options=options)
+
+    driver = webdriver.Chrome(
+        service=Service(
+            ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
+        ),
+        options=options,
+    )
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 10)
-        
+
         # Fetch the profile name
         profile_name_element = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h3 span.json-name"))
@@ -41,7 +54,7 @@ def scrape_duolingo_progress(username):
         minutes = int(offset_match.group(2) or 0) if offset_match else 0
         profile_utc_offset = timedelta(hours=hours, minutes=minutes)
         timezone_str = f"UTC{'+' if hours >= 0 else ''}{hours}:{str(minutes).zfill(2)}"
-        
+
         # Detect local timezone
         local_tz = get_localzone()
 
@@ -52,12 +65,12 @@ def scrape_duolingo_progress(username):
         raw_button.click()
         raw_data_element = wait.until(EC.presence_of_element_located((By.ID, "raw")))
         raw_html = raw_data_element.get_attribute("innerHTML")
-        
+
         # Parse raw data
         soup = BeautifulSoup(raw_html, "html.parser")
         xp_entries = soup.find_all("li")
         data = []
-        
+
         for entry in xp_entries:
             text = entry.get_text(strip=True)
             if "XP" in text:
@@ -76,10 +89,10 @@ def scrape_duolingo_progress(username):
                             dt_utc = dt_profile - profile_utc_offset
                             dt_local = dt_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
                             data.append({
-                                "datetime": dt_local,
-                                "date": dt_local.strftime("%d-%m-%Y"),
+                                "date": dt_local.strftime("%Y-%m-%d"),
                                 "time": dt_local.strftime("%H:%M:%S"),
-                                "xp": xp
+                                "xp": xp,
+                                "datetime": dt_local,
                             })
 
         # Fetch canvas image
@@ -99,7 +112,7 @@ def scrape_duolingo_progress(username):
 
 # Streamlit App
 def main():
-    st.title("🦉 Duolingo Progress Tracker")
+    st.title("🦉 Duolingo Progress Tracker with Plotly")
     st.markdown("Enter a Duolingo username to fetch and visualize their progress.")
     
     username = st.text_input("Enter Duolingo username:")
@@ -109,10 +122,10 @@ def main():
                 try:
                     profile_name, df, timezone_str, canvas_image_data = scrape_duolingo_progress(username)
                     st.success(f"Data fetched successfully for {profile_name}!")
-                    
+
                     # Display player's timezone
                     st.markdown(f"**Player's Timezone:** {timezone_str}")
-                    
+
                     # Display progress data
                     st.subheader("Progress Data")
                     st.dataframe(df[['date', 'time', 'xp']], use_container_width=True)
@@ -126,25 +139,27 @@ def main():
                         mime="text/csv"
                     )
 
-                    # Create Altair chart
+                    # Display progress visualization using Plotly
                     st.subheader("Progress Visualization")
-                    chart = alt.Chart(df).mark_bar().encode(
-                        y=alt.Y('datetime:T', axis=alt.Axis(title="Lesson (Date & Time)", labelAngle=-45)),
-                        x=alt.X('xp:Q', axis=alt.Axis(title="XP Gained")),
-                        color=alt.value('#22FF44')
-                    ).properties(
+                    fig = px.bar(
+                        df,
+                        x='xp',
+                        y='datetime',
+                        orientation='h',
+                        text='xp',
+                        labels={'datetime': 'Date & Time', 'xp': 'XP Gained'},
                         title=f"{profile_name}'s Progress Visualization",
-                        width=800,
-                        height=400
+                        template='plotly_white',
                     )
+                    fig.update_traces(marker_color='#22FF44', textposition='outside')
+                    st.plotly_chart(fig, use_container_width=True)
 
-                    # Render and export chart
-                    st.altair_chart(chart, use_container_width=True)
-                    chart.save('chart.png')
+                    # Download Plotly graph as PNG
+                    png_bytes = fig.to_image(format="png")
                     st.download_button(
-                        label="Download Progress Chart (PNG)",
-                        data=open('chart.png', 'rb').read(),
-                        file_name=f"{profile_name}_progress_chart.png",
+                        label="Download Plot (PNG)",
+                        data=png_bytes,
+                        file_name=f"{profile_name}_progress_plot.png",
                         mime="image/png"
                     )
 
@@ -159,14 +174,14 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error(f"❌ Error: {e}. Please try again.")
+                    st.error(f"❌ Error: Wrong username!! Please try again")
         else:
             st.warning("Please enter a username.")
+
 
 def add_footer():
     footer = """
     <style>
-        /* Position the footer */
         .footer {
             position: fixed;
             bottom: 0;
