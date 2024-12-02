@@ -121,8 +121,11 @@ def main():
                     file_name=csv_filename,
                     mime="text/csv",
                 )
-                xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"))
-                xp_df = pd.DataFrame(xp_data)
+
+                 # Sort XP data by datetime in descending order
+
+                xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"), reverse=True)
+                
                 # Visualize XP Data
                 st.subheader(f"{profile_name}'s XP Progress")
                 fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
