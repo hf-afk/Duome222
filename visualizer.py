@@ -44,7 +44,7 @@ def scrape_duolingo_progress(username):
         refresh_button.click()
         
         # Wait for the data to refresh and load
-        time.sleep(5)  # Adjust delay as needed
+        EC.wait(5)# Adjust delay as needed
         
         # Check if profile exists
         profile_name_element = wait.until(
