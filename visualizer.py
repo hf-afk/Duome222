@@ -9,7 +9,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import base64
-import re
 import time
 
 # Function to scrape Duolingo progress
@@ -63,12 +62,19 @@ def scrape_duolingo_progress(username):
                     if xp_match:
                         xp = int(xp_match.group(1))
                         # Format date and time
-                        date, time_str = datetime_part.split(" ")
-                        formatted_datetime = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M:%S")
-                        xp_data.append({"datetime": formatted_datetime, "xp": xp})
+                        try:
+                            formatted_datetime = datetime.strptime(datetime_part, "%d-%m-%Y %H:%M:%S")
+                        except ValueError as e:
+                            st.warning(f"Error parsing date: {datetime_part}. {e}")
+                            continue
+                        xp_data.append({
+                            "Date": formatted_datetime.strftime("%Y-%m-%d"),
+                            "Time": formatted_datetime.strftime("%H:%M:%S"),
+                            "XP": xp
+                        })
         
         # Sort XP data by datetime
-        xp_data.sort(key=lambda x: x["datetime"])
+        xp_data.sort(key=lambda x: (x["Date"], x["Time"]))
         xp_df = pd.DataFrame(xp_data)
 
         # Step 6: Scrape the progress history canvas as PNG
@@ -88,7 +94,7 @@ def scrape_duolingo_progress(username):
 # Streamlit App
 def main():
     st.title("Duolingo Progress Tracker")
-    st.markdown("Track your Duolingo progress with a detailed XP chart and downloadable data.")
+    st.markdown("Track your Duolingo progress with detailed XP charts and downloadable data.")
     
     username = st.text_input("Enter Duolingo username:")
     
@@ -100,6 +106,10 @@ def main():
                 if profile_name and not xp_df.empty:
                     st.success(f"Data fetched successfully for {profile_name}!")
                     st.markdown(f"**Timezone:** {timezone}")
+
+                    # Display the XP data table
+                    st.markdown("### XP Data Table")
+                    st.dataframe(xp_df, use_container_width=True)
 
                     # Save XP data to CSV
                     csv_filename = f"{profile_name}_progress.csv"
@@ -113,10 +123,11 @@ def main():
 
                     # Visualize XP Data
                     st.subheader(f"{profile_name}'s XP Progress")
-                    plt.figure(figsize=(12, 6))
+                    dynamic_height = max(6, len(xp_df) // 2)
+                    plt.figure(figsize=(12, dynamic_height))
                     plt.barh(
-                        xp_df["datetime"].dt.strftime("%d-%m %H:%M"), 
-                        xp_df["xp"], 
+                        xp_df["Time"], 
+                        xp_df["XP"], 
                         color="#3498db", 
                         edgecolor="black"
                     )
@@ -139,7 +150,7 @@ def main():
 
                     # Show and Download Canvas Image
                     if canvas_image:
-                        st.image(canvas_image, caption="Progress History Canvas", use_column_width=True)
+                        st.image(canvas_image, caption="Progress History Canvas", use_container_width=True)
                         st.download_button(
                             label="Download Progress History (PNG)",
                             data=canvas_image,
@@ -150,6 +161,10 @@ def main():
                     st.error("No data found for the username provided. Please try again.")
         else:
             st.warning("Please enter a username.")
+
+    # Footer
+    st.markdown("---")
+    st.markdown("**Developed by [Your Name/Team]** | Data sourced from [Duome.eu](https://duome.eu) | For educational purposes only.")
 
 if __name__ == "__main__":
     main()
