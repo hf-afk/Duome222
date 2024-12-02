@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import base64
+import re
 import time
 
 # Function to scrape Duolingo progress
