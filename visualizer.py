@@ -1,4 +1,4 @@
-# Import necessary libraries
+# Required Libraries
 import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -7,59 +7,50 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-import pytz
-from tzlocal import get_localzone
+from datetime import datetime
 import base64
-import re
 import time
 
-# Define the main scraping function
+# Function to scrape Duolingo progress
 def scrape_duolingo_progress(username):
     url = f"https://duome.eu/{username}"
     
-    # Configure Selenium WebDriver
+    # Selenium WebDriver Configuration
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=options)
-    data = []
-    canvas_image = None
     
     try:
+        # Open URL
         driver.get(url)
-        wait = WebDriverWait(driver, 15)  # Extended wait time for slower responses
+        wait = WebDriverWait(driver, 15)
 
-        # Click the refresh button to reload the data
-        refresh_button = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/p/b/span"))
-        )
+        # Step 1: Click the refresh button
+        refresh_button = wait.until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/p/b/span")))
         refresh_button.click()
+        time.sleep(5)  # Delay to let data refresh
 
-        # Add delay to allow data to load fully
-        time.sleep(5)  # Adjust this delay as needed based on actual response time
-
-        # Check if profile exists
-        profile_name_element = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "h3 span.json-name"))
-        )
+        # Step 2: Scrape profile name
+        profile_name_element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/div[1]/div[3]/h3/span")))
         profile_name = profile_name_element.text.strip()
-        
-        # Get raw data
-        raw_button = wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "a.btn.q.raw"))
-        )
+
+        # Step 3: Scrape player's timezone
+        timezone_element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[4]/h4/span")))
+        timezone = timezone_element.text.strip()
+
+        # Step 4: Click the raw button to open the popup
+        raw_button = wait.until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[4]/h4/a")))
         raw_button.click()
-        
-        raw_data_element = wait.until(
-            EC.presence_of_element_located((By.ID, "raw"))
-        )
-        raw_html = raw_data_element.get_attribute("innerHTML")
+        time.sleep(3)  # Delay for popup to load
+
+        # Step 5: Scrape XP data from the popup
+        raw_data_element = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='raw']/ul")))
+        raw_html = raw_data_element.get_attribute("outerHTML")
         soup = BeautifulSoup(raw_html, "html.parser")
         
-        # Parse raw XP data
+        xp_data = []
         xp_entries = soup.find_all("li")
         for entry in xp_entries:
             text = entry.get_text(strip=True)
@@ -70,86 +61,92 @@ def scrape_duolingo_progress(username):
                     xp_match = re.search(r"(\d+)\s*XP", parts[1])
                     if xp_match:
                         xp = int(xp_match.group(1))
-                        date, time = datetime_part.split(" ")
-                        data.append({"date": date, "time": time, "xp": xp})
+                        # Format date and time
+                        date, time_str = datetime_part.split(" ")
+                        formatted_datetime = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M:%S")
+                        xp_data.append({"datetime": formatted_datetime, "xp": xp})
         
-        # Capture canvas image
-        canvas_element = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "#myCanvas"))
-        )
-        canvas_data_url = driver.execute_script(
-            "return arguments[0].toDataURL('image/png').substring(22);", canvas_element
-        )
+        # Sort XP data by datetime
+        xp_data.sort(key=lambda x: x["datetime"])
+        xp_df = pd.DataFrame(xp_data)
+
+        # Step 6: Scrape the progress history canvas as PNG
+        canvas_element = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='myCanvas']")))
+        canvas_data_url = driver.execute_script("return arguments[0].toDataURL('image/png').substring(22);", canvas_element)
         canvas_image = base64.b64decode(canvas_data_url)
-        
-        # Return profile name, data, and canvas image
-        return profile_name, pd.DataFrame(data), canvas_image
-    
+
+        return profile_name, timezone, xp_df, canvas_image
+
     except Exception as e:
-        st.error(f"Error: {e}")
-        return None, None, None
+        st.error(f"An error occurred: {e}")
+        return None, None, None, None
+
     finally:
         driver.quit()
 
-# Streamlit interface
+# Streamlit App
 def main():
     st.title("Duolingo Progress Tracker")
-    st.markdown("Enter a Duolingo username to fetch and visualize their progress!")
+    st.markdown("Track your Duolingo progress with a detailed XP chart and downloadable data.")
     
-    username = st.text_input("Username:")
+    username = st.text_input("Enter Duolingo username:")
     
     if st.button("Fetch Progress"):
         if username:
-            with st.spinner("Fetching data..."):
-                profile_name, df, canvas_image = scrape_duolingo_progress(username)
-                if profile_name and not df.empty:
+            with st.spinner("Fetching progress..."):
+                profile_name, timezone, xp_df, canvas_image = scrape_duolingo_progress(username)
+                
+                if profile_name and not xp_df.empty:
                     st.success(f"Data fetched successfully for {profile_name}!")
-                    
-                    # Save data to CSV
+                    st.markdown(f"**Timezone:** {timezone}")
+
+                    # Save XP data to CSV
                     csv_filename = f"{profile_name}_progress.csv"
-                    df.to_csv(csv_filename, index=False)
+                    xp_df.to_csv(csv_filename, index=False)
                     st.download_button(
-                        label="Download Progress Data (CSV)",
+                        label="Download XP Data as CSV",
                         data=open(csv_filename, "rb").read(),
                         file_name=csv_filename,
                         mime="text/csv",
                     )
-                    
-                    # Plot XP data
-                    st.subheader(f"{profile_name}'s Progress Visualization")
-                    df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'])
-                    df.sort_values('datetime', inplace=True)
-                    
-                    plt.figure(figsize=(10, 6))
-                    plt.barh(df['datetime'].dt.strftime('%d-%m %H:%M'), df['xp'], color='#22FF44', edgecolor='black')
+
+                    # Visualize XP Data
+                    st.subheader(f"{profile_name}'s XP Progress")
+                    plt.figure(figsize=(12, 6))
+                    plt.barh(
+                        xp_df["datetime"].dt.strftime("%d-%m %H:%M"), 
+                        xp_df["xp"], 
+                        color="#3498db", 
+                        edgecolor="black"
+                    )
                     plt.xlabel("XP Gained")
                     plt.ylabel("Date & Time")
                     plt.title("XP Progress Over Time")
-                    
-                    # Save the plot
-                    plot_filename = f"{profile_name}_progress_plot.png"
-                    plt.savefig(plot_filename)
+                    plt.tight_layout()
+
+                    # Save and Show Chart
+                    chart_filename = f"{profile_name}_xp_chart.png"
+                    plt.savefig(chart_filename)
                     st.pyplot(plt.gcf())
-                    
-                    # Download button for plot
+
                     st.download_button(
-                        label="Download Plot (PNG)",
-                        data=open(plot_filename, "rb").read(),
-                        file_name=plot_filename,
+                        label="Download Chart as PNG",
+                        data=open(chart_filename, "rb").read(),
+                        file_name=chart_filename,
                         mime="image/png",
                     )
-                    
-                    # Show and download canvas image
+
+                    # Show and Download Canvas Image
                     if canvas_image:
-                        st.image(canvas_image, caption="Progress History Canvas", use_container_width=True)
+                        st.image(canvas_image, caption="Progress History Canvas", use_column_width=True)
                         st.download_button(
-                            label="Download History Canvas (PNG)",
+                            label="Download Progress History (PNG)",
                             data=canvas_image,
                             file_name=f"{profile_name}_history.png",
                             mime="image/png",
                         )
                 else:
-                    st.error("❌ No data found or invalid username. Please try again.")
+                    st.error("No data found for the username provided. Please try again.")
         else:
             st.warning("Please enter a username.")
 
