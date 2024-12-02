@@ -1,6 +1,4 @@
-# Install necessary libraries if needed
-# pip install streamlit selenium pandas matplotlib beautifulsoup4 pytz tzlocal
-
+# Import necessary libraries
 import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -32,22 +30,22 @@ def scrape_duolingo_progress(username):
     
     try:
         driver.get(url)
-        wait = WebDriverWait(driver, 10)
-        
+        wait = WebDriverWait(driver, 15)  # Extended wait time for slower responses
+
+        # Click the refresh button to reload the data
+        refresh_button = wait.until(
+            EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/p/b/span"))
+        )
+        refresh_button.click()
+
+        # Add delay to allow data to load fully
+        time.sleep(5)  # Adjust this delay as needed based on actual response time
+
         # Check if profile exists
         profile_name_element = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h3 span.json-name"))
         )
         profile_name = profile_name_element.text.strip()
-        
-        # Click the refresh button to ensure updated data
-        refresh_button = wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, f"span[data-id='{username}']"))
-        )
-        refresh_button.click()
-        
-        # Allow data to load after refresh
-        time.sleep(5)  # Adjust based on observed delays
         
         # Get raw data
         raw_button = wait.until(
@@ -63,7 +61,6 @@ def scrape_duolingo_progress(username):
         
         # Parse raw XP data
         xp_entries = soup.find_all("li")
-        local_tz = get_localzone()
         for entry in xp_entries:
             text = entry.get_text(strip=True)
             if "XP" in text:
@@ -73,14 +70,8 @@ def scrape_duolingo_progress(username):
                     xp_match = re.search(r"(\d+)\s*XP", parts[1])
                     if xp_match:
                         xp = int(xp_match.group(1))
-                        date, time_part = datetime_part.split(" ")
-                        datetime_profile = datetime.strptime(f"{date} {time_part}", "%Y-%m-%d %H:%M:%S")
-                        datetime_local = datetime_profile.astimezone(local_tz)
-                        data.append({
-                            "date": datetime_local.strftime("%d-%m-%Y"),
-                            "time": datetime_local.strftime("%H:%M:%S"),
-                            "xp": xp
-                        })
+                        date, time = datetime_part.split(" ")
+                        data.append({"date": date, "time": time, "xp": xp})
         
         # Capture canvas image
         canvas_element = wait.until(
@@ -102,10 +93,10 @@ def scrape_duolingo_progress(username):
 
 # Streamlit interface
 def main():
-    st.title("🦉 Duolingo Progress Tracker")
+    st.title("Duolingo Progress Tracker")
     st.markdown("Enter a Duolingo username to fetch and visualize their progress!")
     
-    username = st.text_input("Enter Duolingo username:")
+    username = st.text_input("Username:")
     
     if st.button("Fetch Progress"):
         if username:
