@@ -10,19 +10,18 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import base64
 import time
-import re
 
 # Function to scrape Duolingo progress
 def scrape_duolingo_progress(username):
     url = f"https://duome.eu/{username}"
-    
+
     # Selenium WebDriver Configuration
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=options)
-    
+
     try:
         # Open URL
         driver.get(url)
@@ -50,7 +49,7 @@ def scrape_duolingo_progress(username):
         raw_data_element = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='raw']/ul")))
         raw_html = raw_data_element.get_attribute("outerHTML")
         soup = BeautifulSoup(raw_html, "html.parser")
-        
+
         xp_data = []
         xp_entries = soup.find_all("li")
         for entry in xp_entries:
@@ -67,10 +66,13 @@ def scrape_duolingo_progress(username):
                             formatted_datetime = datetime.strptime(datetime_part, "%Y-%m-%d %H:%M:%S")
                         except ValueError:
                             formatted_datetime = datetime.strptime(datetime_part, "%d-%m-%Y %H:%M:%S")
-                        xp_data.append({"datetime": formatted_datetime, "xp": xp})
-        
-        # Sort XP data by datetime
-        xp_data.sort(key=lambda x: x["datetime"])
+                        # Convert to dd/mm/yyyy and 12-hour format
+                        date = formatted_datetime.strftime("%d/%m/%Y")
+                        time_12h = formatted_datetime.strftime("%I:%M:%S %p")
+                        xp_data.append({"date": date, "time": time_12h, "xp": xp})
+
+        # Sort XP data by date and time
+        xp_data.sort(key=lambda x: (x["date"], x["time"]))
         xp_df = pd.DataFrame(xp_data)
 
         # Step 6: Scrape the progress history canvas as PNG
@@ -80,30 +82,50 @@ def scrape_duolingo_progress(username):
 
         return profile_name, timezone, xp_df, canvas_image
 
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+    except Exception:
         return None, None, None, None
 
     finally:
         driver.quit()
 
+# Footer
+def add_footer():
+    footer = """
+    <style>
+        .footer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            text-align: left;
+            font-size: 12px;
+            padding: 10px;
+            color: #777;
+        }
+    </style>
+    <div class="footer">
+        © 2024 Made with 💚 by AZIZ.
+    </div>
+    """
+    st.markdown(footer, unsafe_allow_html=True)
+
 # Streamlit App
 def main():
     st.title("Duolingo Progress Tracker")
     st.markdown("Track your Duolingo progress with a detailed XP chart and downloadable data.")
-    
+
     username = st.text_input("Enter Duolingo username:")
-    
+
     if st.button("Fetch Progress"):
         if username:
             with st.spinner("Fetching progress..."):
                 profile_name, timezone, xp_df, canvas_image = scrape_duolingo_progress(username)
-                
+
                 # Exit function if the username is invalid or no data is found
                 if not profile_name or xp_df.empty:
-                    st.error("Invalid username or no data found. Please try again.")
+                    st.error("❌ Wrong username or data not found. Please try again.")
                     return
-                
+
                 # Display user profile information
                 st.success(f"Data fetched successfully for {profile_name}!")
                 st.markdown(f"**Timezone:** {timezone}")
@@ -125,15 +147,17 @@ def main():
                 st.subheader(f"{profile_name}'s XP Progress")
                 fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
                 ax.barh(
-                    xp_df["datetime"].dt.strftime("%d-%m %H:%M"), 
-                    xp_df["xp"], 
-                    color="#3498db", 
-                    edgecolor="black"
+                    xp_df["date"] + " " + xp_df["time"],
+                    xp_df["xp"],
+                    color="#78C800",  # Duolingo green
+                    edgecolor="black",
                 )
+                for i, v in enumerate(xp_df["xp"]):
+                    ax.text(v + 1, i, str(v), va="center", fontsize=8, color="black")
                 ax.set_xlabel("XP Gained")
                 ax.set_ylabel("Date & Time")
                 ax.set_title("XP Progress Over Time")
-                plt.tight_layout()
+                plt.tight_layout(rect=[0, 0, 1, 0.95])  # Remove large gaps
 
                 # Save and Show Chart
                 chart_filename = f"{profile_name}_xp_chart.png"
@@ -159,9 +183,8 @@ def main():
         else:
             st.warning("Please enter a username.")
 
-# Footer
-st.markdown("---")
-st.markdown("**Duolingo Progress Tracker** built with ❤️ using Streamlit and Selenium.")
+    # Add footer
+    add_footer()
 
 if __name__ == "__main__":
     main()
