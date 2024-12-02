@@ -35,6 +35,15 @@ def scrape_duolingo_progress(username):
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 10)
+
+        # Click the refresh button
+        refresh_button = wait.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, f"span[data-id='{username}']"))
+        )
+        refresh_button.click()
+        
+        # Wait for the data to refresh and load
+        time.sleep(5)  # Adjust delay as needed
         
         # Check if profile exists
         profile_name_element = wait.until(
