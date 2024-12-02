@@ -71,9 +71,9 @@ def scrape_duolingo_progress(username):
                         formatted_time = parsed_datetime.strftime("%I:%M:%S %p")
                         xp_data.append({"date": formatted_date, "time": formatted_time, "xp": xp})
         
-        # Sort XP data by datetime in ascending order
-        xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"))
-        xp_df = pd.DataFrame(xp_data)
+        # Sort XP data by datetime in descending order
+
+        xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"), reverse=True)
 
         # Step 6: Scrape the progress history canvas as PNG
         canvas_element = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='myCanvas']")))
@@ -121,7 +121,8 @@ def main():
                     file_name=csv_filename,
                     mime="text/csv",
                 )
-
+                xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"))
+                xp_df = pd.DataFrame(xp_data)
                 # Visualize XP Data
                 st.subheader(f"{profile_name}'s XP Progress")
                 fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
