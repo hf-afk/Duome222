@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import base64
+import re
 import time
 
 # Function to scrape Duolingo progress
@@ -61,19 +62,17 @@ def scrape_duolingo_progress(username):
                     xp_match = re.search(r"(\d+)\s*XP", parts[1])
                     if xp_match:
                         xp = int(xp_match.group(1))
-                        # Format date and time (dd/mm/yyyy and 12-hour format)
+                        # Format date and time (dd/mm/yyyy, 12-hour format)
                         try:
-                            formatted_datetime = datetime.strptime(datetime_part, "%Y-%m-%d %H:%M:%S")
+                            parsed_datetime = datetime.strptime(datetime_part, "%Y-%m-%d %H:%M:%S")
                         except ValueError:
-                            formatted_datetime = datetime.strptime(datetime_part, "%d-%m-%Y %H:%M:%S")
-                        xp_data.append({
-                            "date": formatted_datetime.strftime("%d/%m/%Y"),
-                            "time": formatted_datetime.strftime("%I:%M %p"),
-                            "xp": xp
-                        })
+                            parsed_datetime = datetime.strptime(datetime_part, "%d-%m-%Y %H:%M:%S")
+                        formatted_date = parsed_datetime.strftime("%d/%m/%Y")
+                        formatted_time = parsed_datetime.strftime("%I:%M:%S %p")
+                        xp_data.append({"date": formatted_date, "time": formatted_time, "xp": xp})
         
-        # Sort XP data by time (newest first)
-        xp_data = sorted(xp_data, key=lambda x: datetime.strptime(f"{x['date']} {x['time']}", "%d/%m/%Y %I:%M %p"), reverse=True)
+        # Sort XP data by datetime in descending order
+        xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"), reverse=True)
         xp_df = pd.DataFrame(xp_data)
 
         # Step 6: Scrape the progress history canvas as PNG
@@ -83,17 +82,98 @@ def scrape_duolingo_progress(username):
 
         return profile_name, timezone, xp_df, canvas_image
 
-    except Exception:
+    except Exception as e:
         return None, None, None, None
 
     finally:
         driver.quit()
 
-# Add Footer
+# Streamlit App
+def main():
+    st.title("Duolingo Progress Tracker")
+    st.markdown("Track your Duolingo progress with a detailed XP chart and downloadable data.")
+    
+    username = st.text_input("Enter Duolingo username:")
+    
+    if st.button("Fetch Progress"):
+        if username:
+            with st.spinner("Fetching progress..."):
+                profile_name, timezone, xp_df, canvas_image = scrape_duolingo_progress(username)
+                
+                # Exit function if the username is invalid or no data is found
+                if not profile_name or xp_df.empty:
+                    st.error("❌ Wrong username or no data found. Please try again.")
+                    return
+                
+                # Display user profile information
+                st.success(f"Data fetched successfully for {profile_name}!")
+                st.markdown(f"**Timezone:** {timezone}")
+
+                # Save and display XP data in CSV format
+                csv_filename = f"{profile_name.replace(' ', '_')}_progress.csv"
+                xp_df.to_csv(csv_filename, index=False)
+                st.markdown("### Full XP Data:")
+                st.dataframe(xp_df, use_container_width=True)  # Display CSV data in full width
+
+                st.download_button(
+                    label="Download XP Data as CSV",
+                    data=open(csv_filename, "rb").read(),
+                    file_name=csv_filename,
+                    mime="text/csv",
+                )
+
+                # Visualize XP Data
+                st.subheader(f"{profile_name}'s XP Progress")
+                fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
+                bars = ax.barh(
+                    xp_df["date"] + " " + xp_df["time"], 
+                    xp_df["xp"], 
+                    color="#78C800", 
+                    edgecolor="black"
+                )
+                # Add XP labels to bars
+                for bar in bars:
+                    width = bar.get_width()
+                    ax.text(
+                        width + 5,  # Position slightly to the right of the bar
+                        bar.get_y() + bar.get_height() / 2, 
+                        f"{int(width)} XP", 
+                        va="center", 
+                        fontsize=10
+                    )
+                ax.set_xlabel("XP Gained")
+                ax.set_ylabel("Date & Time")
+                ax.set_title("XP Progress Over Time")
+                plt.tight_layout()
+
+                # Save and Show Chart
+                chart_filename = f"{profile_name.replace(' ', '_')}_xp_chart.png"
+                plt.savefig(chart_filename)
+                st.pyplot(fig)
+
+                st.download_button(
+                    label="Download Chart as PNG",
+                    data=open(chart_filename, "rb").read(),
+                    file_name=chart_filename,
+                    mime="image/png",
+                )
+
+                # Show and Download Canvas Image
+                if canvas_image:
+                    st.image(canvas_image, caption="Progress History Canvas", use_container_width=True)
+                    st.download_button(
+                        label="Download Progress History (PNG)",
+                        data=canvas_image,
+                        file_name=f"{profile_name.replace(' ', '_')}_history.png",
+                        mime="image/png",
+                    )
+        else:
+            st.warning("Please enter a username.")
+
+# Footer
 def add_footer():
     footer = """
     <style>
-        /* Position the footer */
         .footer {
             position: fixed;
             bottom: 0;
@@ -111,85 +191,7 @@ def add_footer():
     """
     st.markdown(footer, unsafe_allow_html=True)
 
-# Streamlit App
-def main():
-    st.title("Duolingo Progress Tracker")
-    st.markdown("Track your Duolingo progress with a detailed XP chart and downloadable data.")
-    
-    username = st.text_input("Enter Duolingo username:")
-    
-    if st.button("Fetch Progress"):
-        if username:
-            with st.spinner("Fetching progress..."):
-                profile_name, timezone, xp_df, canvas_image = scrape_duolingo_progress(username)
-                
-                # Exit function if the username is invalid or no data is found
-                if not profile_name or xp_df.empty:
-                    st.error("😞 Wrong username or data not found. Please try again.")
-                    return
-                
-                # Display user profile information
-                st.success(f"Data fetched successfully for {profile_name}!")
-                st.markdown(f"**Timezone:** {timezone}")
-
-                # Save and display XP data in CSV format
-                csv_filename = f"{profile_name}_progress.csv"
-                xp_df.to_csv(csv_filename, index=False)
-                st.markdown("### Full XP Data:")
-                st.dataframe(xp_df, use_container_width=True)
-
-                st.download_button(
-                    label="Download XP Data as CSV",
-                    data=open(csv_filename, "rb").read(),
-                    file_name=csv_filename,
-                    mime="text/csv",
-                )
-
-                # Visualize XP Data
-                st.subheader(f"{profile_name}'s XP Progress")
-                fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
-                bars = ax.barh(
-                    xp_df["date"] + " " + xp_df["time"], 
-                    xp_df["xp"], 
-                    color="#78C800",  # Duolingo green
-                    edgecolor="black"
-                )
-                ax.set_xlabel("XP Gained")
-                ax.set_ylabel("Date & Time")
-                ax.set_title("XP Progress Over Time", pad=10)
-
-                # Add XP labels to bars
-                for bar, xp in zip(bars, xp_df["xp"]):
-                    ax.text(bar.get_width() + 5, bar.get_y() + bar.get_height()/2, str(xp), va="center", fontsize=10)
-
-                plt.tight_layout()
-
-                # Save and Show Chart
-                chart_filename = f"{profile_name}_xp_chart.png"
-                plt.savefig(chart_filename)
-                st.pyplot(fig)
-
-                st.download_button(
-                    label="Download Chart as PNG",
-                    data=open(chart_filename, "rb").read(),
-                    file_name=chart_filename,
-                    mime="image/png",
-                )
-
-                # Show and Download Canvas Image
-                if canvas_image:
-                    st.image(canvas_image, caption="Progress History Canvas", use_container_width=True)
-                    st.download_button(
-                        label="Download Progress History (PNG)",
-                        data=canvas_image,
-                        file_name=f"{profile_name}_history.png",
-                        mime="image/png",
-                    )
-        else:
-            st.warning("Please enter a username.")
-
-# Add Footer
-add_footer()
-
+# Main Function
 if __name__ == "__main__":
     main()
+    add_footer()
