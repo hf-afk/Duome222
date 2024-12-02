@@ -72,8 +72,8 @@ def scrape_duolingo_progress(username):
                         xp_data.append({"date": formatted_date, "time": formatted_time, "xp": xp})
         
         # Sort XP data by datetime in descending order
-
         xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"), reverse=True)
+        xp_df = pd.DataFrame(xp_data)
 
         # Step 6: Scrape the progress history canvas as PNG
         canvas_element = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='myCanvas']")))
@@ -122,17 +122,14 @@ def main():
                     mime="text/csv",
                 )
 
-                 
-                
                 # Visualize XP Data
                 st.subheader(f"{profile_name}'s XP Progress")
                 fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
                 bars = ax.barh(
-                    xp_df["date"] + " | " + xp_df["time"], 
+                    xp_df["date"] + " " + xp_df["time"], 
                     xp_df["xp"], 
                     color="#78C800", 
-                    edgecolor="black",
-                    height=0.8  # Increase bar thickness
+                    edgecolor="black"
                 )
                 # Add XP labels to bars
                 for bar in bars:
@@ -145,7 +142,7 @@ def main():
                         fontsize=10
                     )
                 ax.set_xlabel("XP Gained")
-                ax.set_ylabel("Date | Time")
+                ax.set_ylabel("Date & Time")
                 ax.set_title("XP Progress Over Time")
                 plt.tight_layout()
 
@@ -196,5 +193,5 @@ def add_footer():
 
 # Main Function
 if __name__ == "__main__":
-    add_footer()
     main()
+    add_footer()
