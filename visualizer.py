@@ -13,6 +13,7 @@ from tzlocal import get_localzone
 import re
 import base64
 from io import BytesIO
+import time  # For adding delays
 
 # Function to scrape Duolingo progress
 def scrape_duolingo_progress(username):
@@ -27,6 +28,15 @@ def scrape_duolingo_progress(username):
         driver.get(url)
         wait = WebDriverWait(driver, 10)
         
+        # Click the refresh button
+        refresh_button = wait.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, f"span[data-id='{username}']"))
+        )
+        refresh_button.click()
+        
+        # Wait for the data to refresh and load
+        time.sleep(5)  # Adjust delay as needed
+
         # Fetch the profile name
         profile_name_element = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h3 span.json-name"))
@@ -123,7 +133,6 @@ def plot_progress(df, profile_name):
     buffer.seek(0)
     return buffer
 
-
 # Streamlit App
 def main():
     st.title("🦉 Duolingo Progress Tracker")
@@ -175,7 +184,7 @@ def main():
                     )
 
                 except Exception as e:
-                    st.error(f"❌ Error: Wrong username!! Please try again")
+                    st.error(f"❌ Error: Unable to fetch data. Please try again.")
         else:
             st.warning("Please enter a username.")
 
