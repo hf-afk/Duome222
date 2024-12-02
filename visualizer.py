@@ -16,6 +16,7 @@ import base64
 import re
 import os
 from io import BytesIO
+import time
 
 # Define the main scraping function
 def scrape_duolingo_progress(username):
