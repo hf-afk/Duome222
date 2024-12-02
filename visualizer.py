@@ -122,9 +122,7 @@ def main():
                     mime="text/csv",
                 )
 
-                 # Sort XP data by datetime in descending order
-
-                xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"), reverse=True)
+                 
                 
                 # Visualize XP Data
                 st.subheader(f"{profile_name}'s XP Progress")
