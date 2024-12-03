@@ -123,18 +123,28 @@ def main():
                 )
 
                 # Visualize XP Data
+
                 st.subheader(f"{profile_name}'s XP Progress")
+
                 
+
                 # Reverse the order of the plot (opposite of CSV)
+
                 xp_df_reversed = xp_df.iloc[::-1]
 
+
+
                 fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df_reversed) // 5)))  # Dynamic height
+
                 bars = ax.barh(
+
                     xp_df_reversed["date"] + " " + xp_df_reversed["time"], 
+
                     xp_df_reversed["xp"], 
+
                     color="#78C800", 
+
                     edgecolor="black",
-                    height=1.6  # Increase bar thickness
                 )
                 # Add XP labels to bars
                 for bar in bars:
@@ -144,12 +154,11 @@ def main():
                         bar.get_y() + bar.get_height() / 2, 
                         f"{int(width)} XP", 
                         va="center", 
-                        fontsize=12  # Increase font size
+                        fontsize=10
                     )
-                ax.set_xlabel("XP Gained", fontsize=14)  # Increase axis label font size
-                ax.set_ylabel("Date & Time", fontsize=14)  # Increase axis label font size
-                ax.set_title("XP Progress Over Time", fontsize=16)  # Increase title font size
-                ax.tick_params(axis="both", labelsize=12)  # Increase tick label font size
+                ax.set_xlabel("XP Gained")
+                ax.set_ylabel("Date & Time")
+                ax.set_title("XP Progress Over Time")
                 plt.tight_layout()
 
                 # Save and Show Chart
