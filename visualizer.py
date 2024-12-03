@@ -71,7 +71,7 @@ def scrape_duolingo_progress(username):
                         formatted_time = parsed_datetime.strftime("%I:%M:%S %p")
                         xp_data.append({"date": formatted_date, "time": formatted_time, "xp": xp})
         
-        # Sort XP data by datetime in descending order
+        # Sort XP data by datetime in descending order for CSV
         xp_data.sort(key=lambda x: datetime.strptime(x["date"] + " " + x["time"], "%d/%m/%Y %I:%M:%S %p"), reverse=True)
         xp_df = pd.DataFrame(xp_data)
 
@@ -124,12 +124,17 @@ def main():
 
                 # Visualize XP Data
                 st.subheader(f"{profile_name}'s XP Progress")
+                
+                # Sort XP data for the graph in ascending order
+                xp_df_sorted = xp_df.sort_values(by=["date", "time"], ascending=True)
+
                 fig, ax = plt.subplots(figsize=(12, max(5, len(xp_df) // 5)))  # Dynamic height
                 bars = ax.barh(
-                    xp_df["date"] + " " + xp_df["time"], 
-                    xp_df["xp"], 
+                    xp_df_sorted["date"] + " " + xp_df_sorted["time"], 
+                    xp_df_sorted["xp"], 
                     color="#78C800", 
-                    edgecolor="black"
+                    edgecolor="black",
+                    height=1.6  # Twice thicker bars
                 )
                 # Add XP labels to bars
                 for bar in bars:
