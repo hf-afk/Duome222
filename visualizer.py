@@ -91,7 +91,10 @@ def scrape_duolingo_progress(username):
 # Streamlit App
 def main():
     st.title("Duolingo Progress Tracker")
-    st.markdown("Visualize Duolingo users progress with a detailed XP chart and downloadable data.\nN.B.Please click fetch progress a few times if data is too old.")
+st.markdown("""
+Visualize Duolingo users progress with a detailed XP chart and downloadable data.<br>
+<span style="color: yellow;">N.B. Please click fetch progress a few times if data is too old.</span>
+""", unsafe_allow_html=True)
     
     username = st.text_input("Enter Duolingo username:")
     
