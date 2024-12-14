@@ -31,7 +31,7 @@ def scrape_duolingo_progress(username):
         # Step 1: Click the refresh button
         refresh_button = wait.until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/p/b/span")))
         refresh_button.click()
-        time.sleep(5)  # Delay to let data refresh
+        time.sleep(7)  # Delay to let data refresh
 
         # Step 2: Scrape profile name
         profile_name_element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/div[1]/div[3]/h3/span")))
